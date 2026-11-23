@@ -169,3 +169,4 @@ export async function logActivity(
 export const validEmail = (value) =>
   typeof value === "string" &&
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
