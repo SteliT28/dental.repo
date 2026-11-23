@@ -5,5 +5,5 @@ pages_build_output_dir = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "dental-practice-directory"
-database_id = "PASTE-YOUR-D1-DATABASE-ID-HERE"
+database_id = "3681f6d6-36fc-4b40-8728-3d7c42634845"
 migrations_dir = "migrations"
