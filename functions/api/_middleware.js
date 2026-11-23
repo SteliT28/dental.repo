@@ -29,7 +29,7 @@ export async function hashCode(code, saltHex) {
     {
       name: "PBKDF2",
       salt: hexToBytes(saltHex),
-      iterations: 210000,
+      iterations: 100000,
       hash: "SHA-256"
     },
     key,
