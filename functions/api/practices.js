@@ -5,13 +5,11 @@ export async function onRequestGet({ request, env }) {
   const page = Math.max(1, Number(query.get("page")) || 1);
   const perPage = 25;
 
-  const filters = {
-    page,
-    perPage,
-    inspectionDirectorate:
-      env.CQC_DENTAL_DIRECTORATE || "Primary dental services"
-  };
-
+const filters = {
+  page,
+  perPage,
+  primaryInspectionCategoryCode: "P1"
+};
   for (const key of ["region", "localAuthority"]) {
     const value = query.get(key);
     if (value) filters[key] = value;
