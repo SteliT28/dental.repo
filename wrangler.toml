@@ -1,0 +1,9 @@
+name = "dental-practice-directory"
+compatibility_date = "2026-11-23"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dental-practice-directory"
+database_id = "PASTE-YOUR-D1-DATABASE-ID-HERE"
+migrations_dir = "migrations"
