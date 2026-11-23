@@ -10,9 +10,25 @@
   <style>
     :root{--plum:#893277;--plum-dark:#64215d;--pale:#f5edf4;--ink:#29272a;--muted:#656166;--line:#e4e0e4;--bg:#f7f6f7;--green:#24704b;--blue:#205d83;--amber:#946100}
     *{box-sizing:border-box}
+    [hidden]{display:none!important}
     body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Open Sans",Arial,sans-serif}
     button,input,select,textarea{font:inherit}
     button{cursor:pointer}
+    .auth-screen{position:fixed;inset:0;z-index:10;background:var(--bg);display:grid;place-items:center;padding:18px;overflow:auto}
+    .auth-card{background:#fff;border:1px solid var(--line);border-radius:12px;width:min(540px,100%);padding:24px;box-shadow:0 12px 40px #21142112}
+    .auth-brand{display:flex;align-items:center;gap:10px;font-weight:700;margin-bottom:22px}
+    .auth-title{font-size:22px;margin:0 0 5px}
+    .auth-subtitle{font-size:12px;color:var(--muted);margin:0 0 18px}
+    .auth-form{display:grid;gap:12px}
+    .auth-form label{display:block;font-size:11px;font-weight:700;margin-bottom:4px}
+    .auth-form input{width:100%;border:1px solid #d7d2d7;border-radius:6px;padding:10px;font-size:13px}
+    .auth-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+    .auth-link{border:0;background:none;color:var(--plum-dark);padding:5px 0;font-size:11px;text-decoration:underline}
+    .auth-message{display:none;padding:10px;border-radius:6px;background:#fff3f3;color:#6a2a2a;font-size:12px}
+    .auth-message.show{display:block}
+    .setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .account-card{border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:9px}
+    .account-card h3{font-size:12px;margin:0}
     .shell{min-height:100vh;display:grid;grid-template-columns:230px 1fr}
     aside{background:#fff;border-right:1px solid var(--line);padding:24px 15px;display:flex;flex-direction:column;gap:28px}
     .brand{display:flex;align-items:center;gap:10px;padding:0 8px;font-weight:700}
@@ -23,6 +39,7 @@
     .nav-label{padding:0 12px 7px;color:#79747a;text-transform:uppercase;letter-spacing:.08em;font-size:10px;font-weight:700}
     .userbox{margin-top:auto;border:1px solid var(--line);background:#faf8fa;border-radius:8px;padding:10px;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
     .userbox strong{color:var(--ink);display:block;font-size:12px;margin-bottom:2px}
+    .user-actions{display:flex;gap:8px;margin-top:9px}
     main{min-width:0}
     .topbar{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 26px;color:var(--muted);font-size:12px}
     .content{padding:25px 26px;max-width:1500px;margin:auto}
@@ -94,11 +111,75 @@
     .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#282328;color:#fff;padding:8px 13px;border-radius:7px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .2s}
     .toast.show{opacity:1}
     @media(max-width:1000px){.workspace{grid-template-columns:1fr}.records{max-height:360px}}
-    @media(max-width:700px){.shell{grid-template-columns:1fr}aside{display:none}.topbar{height:53px;padding:0 14px}.content{padding:17px 12px}.heading h1{font-size:21px}.filters{grid-template-columns:1fr 1fr}.search{grid-column:1/-1}.workspace{grid-template-columns:1fr}.records{max-height:330px}}
+    @media(max-width:700px){.auth-card{padding:18px}.setup-grid{grid-template-columns:1fr}.shell{grid-template-columns:1fr}aside{display:none}.topbar{height:53px;padding:0 14px}.content{padding:17px 12px}.heading h1{font-size:21px}.filters{grid-template-columns:1fr 1fr}.search{grid-column:1/-1}.workspace{grid-template-columns:1fr}.records{max-height:330px}}
   </style>
 </head>
 <body>
-<div class="shell">
+
+<div class="auth-screen" id="authScreen" hidden>
+  <div class="auth-card">
+    <div class="auth-brand"><div class="brandmark">PD</div><span>Practice Directory</span></div>
+
+    <section id="loginPanel">
+      <h1 class="auth-title">Sign in</h1>
+      <p class="auth-subtitle">Enter your account username and access code.</p>
+      <div class="auth-message" id="authMessage" role="alert"></div>
+      <form class="auth-form" id="loginForm">
+        <div><label for="loginUsername">Username</label><input id="loginUsername" autocomplete="username" required></div>
+        <div><label for="loginCode">Access code</label><input id="loginCode" type="password" autocomplete="current-password" required></div>
+        <div class="auth-actions">
+          <button class="button primary" type="submit">Sign in</button>
+          <button class="auth-link" type="button" id="showSetup">Set up the four accounts</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="setupPanel" hidden>
+      <h1 class="auth-title">Create the four accounts</h1>
+      <p class="auth-subtitle">This one-time setup needs the setup secret configured in Cloudflare. Use a unique username and access code for each person.</p>
+      <div class="auth-message" id="setupMessage" role="alert"></div>
+      <form class="auth-form" id="setupForm">
+        <div><label for="setupSecret">Setup secret</label><input id="setupSecret" type="password" required autocomplete="off"></div>
+        <div class="setup-grid">
+          <div class="account-card">
+            <h3>Account 1</h3>
+            <div><label for="setupName1">Name</label><input id="setupName1" required maxlength="60"></div>
+            <div><label for="setupUsername1">Username</label><input id="setupUsername1" required minlength="3" maxlength="30"></div>
+            <div><label for="setupCode1">Access code</label><input id="setupCode1" type="password" required minlength="8"></div>
+            <div><label for="setupCodeConfirm1">Confirm access code</label><input id="setupCodeConfirm1" type="password" required minlength="8"></div>
+          </div>
+          <div class="account-card">
+            <h3>Account 2</h3>
+            <div><label for="setupName2">Name</label><input id="setupName2" required maxlength="60"></div>
+            <div><label for="setupUsername2">Username</label><input id="setupUsername2" required minlength="3" maxlength="30"></div>
+            <div><label for="setupCode2">Access code</label><input id="setupCode2" type="password" required minlength="8"></div>
+            <div><label for="setupCodeConfirm2">Confirm access code</label><input id="setupCodeConfirm2" type="password" required minlength="8"></div>
+          </div>
+          <div class="account-card">
+            <h3>Account 3</h3>
+            <div><label for="setupName3">Name</label><input id="setupName3" required maxlength="60"></div>
+            <div><label for="setupUsername3">Username</label><input id="setupUsername3" required minlength="3" maxlength="30"></div>
+            <div><label for="setupCode3">Access code</label><input id="setupCode3" type="password" required minlength="8"></div>
+            <div><label for="setupCodeConfirm3">Confirm access code</label><input id="setupCodeConfirm3" type="password" required minlength="8"></div>
+          </div>
+          <div class="account-card">
+            <h3>Account 4</h3>
+            <div><label for="setupName4">Name</label><input id="setupName4" required maxlength="60"></div>
+            <div><label for="setupUsername4">Username</label><input id="setupUsername4" required minlength="3" maxlength="30"></div>
+            <div><label for="setupCode4">Access code</label><input id="setupCode4" type="password" required minlength="8"></div>
+            <div><label for="setupCodeConfirm4">Confirm access code</label><input id="setupCodeConfirm4" type="password" required minlength="8"></div>
+          </div>
+        </div>
+        <div class="auth-actions">
+          <button class="button" type="button" id="backToLogin">Back to sign in</button>
+          <button class="button primary" type="submit">Create accounts</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<div class="shell" id="appShell" hidden>
   <aside>
     <div class="brand"><div class="brandmark">PD</div><span>Practice Directory</span></div>
     <div>
@@ -108,7 +189,14 @@
         <button id="activityTab">◷ &nbsp; Team activity</button>
       </nav>
     </div>
-    <div class="userbox"><strong>Signed in</strong><span id="currentUser">Loading…</span></div>
+    <div class="userbox">
+      <strong id="currentUser">Signed in</strong>
+      <span id="currentUsername"></span>
+      <div class="user-actions">
+        <button class="button small" id="profileButton">Profile</button>
+        <button class="button small" id="logoutButton">Sign out</button>
+      </div>
+    </div>
   </aside>
   <main>
     <header class="topbar"><span>England</span><span id="headerUser"></span></header>
@@ -163,41 +251,155 @@
     </form>
   </div>
 </div>
+
+<div class="modal-backdrop" id="profileBackdrop" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+  <div class="modal">
+    <div class="modal-head"><h2 id="profileTitle">Edit profile</h2><button class="close" id="closeProfile" aria-label="Close">×</button></div>
+    <form id="profileForm">
+      <div class="modal-body">
+        <div class="form-row"><label for="profileName">Display name</label><input id="profileName" required maxlength="60"></div>
+        <div class="divider"></div>
+        <div class="form-row"><label for="currentCode">Current access code (only needed to change it)</label><input id="currentCode" type="password" autocomplete="current-password"></div>
+        <div class="form-row"><label for="newCode">New access code (at least 8 characters)</label><input id="newCode" type="password" minlength="8" autocomplete="new-password"></div>
+        <div class="form-row"><label for="confirmNewCode">Confirm new access code</label><input id="confirmNewCode" type="password" minlength="8" autocomplete="new-password"></div>
+      </div>
+      <div class="modal-actions"><button type="button" class="button" id="cancelProfile">Cancel</button><button class="button primary" type="submit">Save profile</button></div>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const state={rows:[],selected:null,page:1,total:0,perPage:25,view:"directory",timer:null};
+const state={rows:[],selected:null,page:1,total:0,perPage:25,view:"directory",timer:null,user:null};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function setMessage(id,message){
+  const box=$(id);
+  box.textContent=message;
+  box.classList.toggle("show",Boolean(message));
+}
 
 function showError(message){const n=$("notice");n.textContent=message;n.classList.add("show")}
 function clearError(){$("notice").classList.remove("show")}
 
 async function api(url,options={}){
-  const response=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});
+  const response=await fetch(url,{
+    ...options,
+    headers:{
+      ...(options.body?{"Content-Type":"application/json"}:{}),
+      ...(options.headers||{})
+    }
+  });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);
+  if(!response.ok){
+    const error=new Error(data.error||`Request failed (${response.status})`);
+    error.status=response.status;
+    throw error;
+  }
   return data;
 }
 
-async function loadUser(){
+function showLogin(message=""){
+  $("appShell").hidden=true;
+  $("authScreen").hidden=false;
+  $("loginPanel").hidden=false;
+  $("setupPanel").hidden=true;
+  setMessage("authMessage",message);
+  $("loginUsername").focus();
+}
+
+function setUser(user){
+  state.user=user;
+  $("currentUser").textContent=user.displayName;
+  $("currentUsername").textContent=`@${user.username}`;
+  $("headerUser").textContent=user.displayName;
+}
+
+async function startApp(){
   try{
-    const me=await api("/api/me");
-    $("currentUser").textContent=me.email;
-    $("headerUser").textContent=me.email;
-  }catch(e){showError(e.message)}
-}
-
-function badge(value){return value?`<span class="badge">${esc(value)}</span>`:""}
-
-function params(){
-  const p=new URLSearchParams({page:state.page,perPage:state.perPage});
-  for(const [key,id] of [["q","q"],["region","region"],["localAuthority","localAuthority"]]){
-    if($(id).value.trim())p.set(key,$(id).value.trim());
+    const data=await api("/api/me");
+    setUser(data.user);
+    $("authScreen").hidden=true;
+    $("appShell").hidden=false;
+    clearError();
+    await loadPractices();
+  }catch(error){
+    if(error.status===401){
+      showLogin();
+    }else{
+      showLogin(error.message);
+    }
   }
-  if($("emailFilter").value)p.set("email",$("emailFilter").value);
-  return p;
 }
+
+$("loginForm").onsubmit=async event=>{
+  event.preventDefault();
+  setMessage("authMessage","");
+  try{
+    const result=await api("/api/login",{
+      method:"POST",
+      body:JSON.stringify({
+        username:$("loginUsername").value,
+        code:$("loginCode").value
+      })
+    });
+    $("loginCode").value="";
+    setUser(result.user);
+    $("authScreen").hidden=true;
+    $("appShell").hidden=false;
+    clearError();
+    await loadPractices();
+  }catch(error){
+    setMessage("authMessage",error.message);
+  }
+};
+
+$("showSetup").onclick=()=>{
+  $("loginPanel").hidden=true;
+  $("setupPanel").hidden=false;
+  setMessage("setupMessage","");
+};
+
+$("backToLogin").onclick=()=>showLogin();
+
+$("setupForm").onsubmit=async event=>{
+  event.preventDefault();
+  setMessage("setupMessage","");
+
+  const accounts=[];
+  for(let i=1;i<=4;i++){
+    const code=$(`setupCode${i}`).value;
+    const confirmation=$(`setupCodeConfirm${i}`).value;
+
+    if(code!==confirmation){
+      setMessage("setupMessage",`The access codes for account ${i} do not match.`);
+      return;
+    }
+
+    accounts.push({
+      displayName:$(`setupName${i}`).value,
+      username:$(`setupUsername${i}`).value,
+      code
+    });
+  }
+
+  try{
+    await api("/api/setup",{
+      method:"POST",
+      body:JSON.stringify({
+        setupSecret:$("setupSecret").value,
+        accounts
+      })
+    });
+    $("setupForm").reset();
+    $("loginUsername").value=accounts[0].username;
+    showLogin("The four accounts are ready. Sign in with your username and access code.");
+  }catch(error){
+    setMessage("setupMessage",error.message);
+  }
+};
 
 async function loadPractices(){
   clearError();
@@ -218,11 +420,22 @@ async function loadPractices(){
     $("nextPage").disabled=state.page>=pages;
     renderRows();
     renderDetail();
-  }catch(e){
+  }catch(error){
     state.rows=[];
     $("records").innerHTML='<div class="empty">CQC records could not be loaded.</div>';
-    showError(e.message);
+    showError(error.message);
   }
+}
+
+function badge(value){return value?`<span class="badge">${esc(value)}</span>`:""}
+
+function params(){
+  const p=new URLSearchParams({page:state.page,perPage:state.perPage});
+  for(const [key,id] of [["q","q"],["region","region"],["localAuthority","localAuthority"]]){
+    if($(id).value.trim())p.set(key,$(id).value.trim());
+  }
+  if($("emailFilter").value)p.set("email",$("emailFilter").value);
+  return p;
 }
 
 function renderRows(){
@@ -300,22 +513,22 @@ function renderDetail(){
 
   $("addHere").onclick=()=>openModal();
   $("viewActivity").onclick=()=>showView("activity");
-  document.querySelectorAll(".copy").forEach(b=>b.onclick=async()=>{
-    try{await navigator.clipboard.writeText(b.dataset.email);toast("Copied")}
+  document.querySelectorAll(".copy").forEach(button=>button.onclick=async()=>{
+    try{await navigator.clipboard.writeText(button.dataset.email);toast("Copied")}
     catch{toast("Clipboard access unavailable")}
   });
-  document.querySelectorAll(".edit").forEach(b=>b.onclick=()=>{
-    const contact=p.contacts.find(x=>x.id===b.dataset.id);
+  document.querySelectorAll(".edit").forEach(button=>button.onclick=()=>{
+    const contact=p.contacts.find(item=>item.id===button.dataset.id);
     openModal(contact);
   });
-  document.querySelectorAll(".remove").forEach(b=>b.onclick=async()=>{
-    const contact=p.contacts.find(x=>x.id===b.dataset.id);
+  document.querySelectorAll(".remove").forEach(button=>button.onclick=async()=>{
+    const contact=p.contacts.find(item=>item.id===button.dataset.id);
     if(!confirm(`Delete ${contact.email}?`))return;
     try{
       await api(`/api/contacts/${encodeURIComponent(contact.id)}`,{method:"DELETE"});
       toast("Contact deleted");
       await loadPractices();
-    }catch(e){showError(e.message)}
+    }catch(error){showError(error.message)}
   });
   loadActivity(true);
 }
@@ -325,16 +538,16 @@ async function loadActivity(recent=false){
     const data=await api("/api/activity?limit="+(recent?5:100));
     const list=recent?$("recentActivity"):$("activityList");
     if(!list)return;
-    list.innerHTML=data.activity.length?data.activity.map(a=>`
+    list.innerHTML=data.activity.length?data.activity.map(item=>`
       <div class="activity-item">
-        <div class="avatar">${esc(a.actor_email.slice(0,2).toUpperCase())}</div>
-        <div class="activity-copy"><strong>${esc(a.actor_email)}</strong> ${esc(a.action)} <strong>${esc(a.practice_name)}</strong>
-          <small>${esc(a.details)} · ${new Date(a.created_at).toLocaleString()}</small>
+        <div class="avatar">${esc(String(item.actor_email||"").slice(0,2).toUpperCase())}</div>
+        <div class="activity-copy"><strong>${esc(item.actor_email)}</strong> ${esc(item.action)} <strong>${esc(item.practice_name)}</strong>
+          <small>${esc(item.details)} · ${new Date(item.created_at).toLocaleString()}</small>
         </div>
       </div>`).join(""):'<div class="empty">No activity yet.</div>';
-  }catch(e){
-    if(recent&&$("recentActivity"))$("recentActivity").innerHTML=`<div class="empty">${esc(e.message)}</div>`;
-    else if($("activityList"))$("activityList").innerHTML=`<div class="empty">${esc(e.message)}</div>`;
+  }catch(error){
+    if(recent&&$("recentActivity"))$("recentActivity").innerHTML=`<div class="empty">${esc(error.message)}</div>`;
+    else if($("activityList"))$("activityList").innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   }
 }
 
@@ -366,15 +579,57 @@ function closeModal(){
   $("contactForm").reset();
 }
 
-function toast(text){
-  const t=$("toast");
-  t.textContent=text;
-  t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),1600);
+function openProfile(){
+  $("profileName").value=state.user?.displayName||"";
+  $("currentCode").value="";
+  $("newCode").value="";
+  $("confirmNewCode").value="";
+  $("profileBackdrop").classList.add("open");
 }
 
-$("contactForm").onsubmit=async e=>{
-  e.preventDefault();
+function closeProfile(){
+  $("profileBackdrop").classList.remove("open");
+  $("profileForm").reset();
+}
+
+function toast(text){
+  const element=$("toast");
+  element.textContent=text;
+  element.classList.add("show");
+  setTimeout(()=>element.classList.remove("show"),1600);
+}
+
+$("profileForm").onsubmit=async event=>{
+  event.preventDefault();
+  const newCode=$("newCode").value;
+  const confirmation=$("confirmNewCode").value;
+
+  if(newCode&&newCode!==confirmation){
+    toast("The new access codes do not match");
+    return;
+  }
+
+  try{
+    const result=await api("/api/me",{
+      method:"PUT",
+      body:JSON.stringify({
+        displayName:$("profileName").value,
+        currentCode:$("currentCode").value,
+        newCode
+      })
+    });
+    setUser(result.user);
+    closeProfile();
+    toast("Profile updated");
+  }catch(error){toast(error.message)}
+};
+
+$("loginUsername").addEventListener("input",event=>{
+  event.target.value=event.target.value.toLowerCase();
+});
+
+$("contactForm").onsubmit=async event=>{
+  event.preventDefault();
   if(!state.selected)return;
   const id=$("contactId").value;
   const body={
@@ -393,14 +648,33 @@ $("contactForm").onsubmit=async e=>{
     closeModal();
     toast(id?"Contact updated":"Contact added");
     await loadPractices();
-  }catch(e){showError(e.message)}
+  }catch(error){showError(error.message)}
+};
+
+$("logoutButton").onclick=async()=>{
+  try{await api("/api/logout",{method:"POST"})}catch{}
+  state.user=null;
+  showLogin("You have signed out.");
+};
+
+$("profileButton").onclick=openProfile;
+$("closeProfile").onclick=closeProfile;
+$("cancelProfile").onclick=closeProfile;
+$("profileBackdrop").onclick=event=>{
+  if(event.target.id==="profileBackdrop")closeProfile();
 };
 
 $("addTop").onclick=()=>openModal();
 $("closeModal").onclick=closeModal;
 $("cancelModal").onclick=closeModal;
-$("backdrop").onclick=e=>{if(e.target.id==="backdrop")closeModal()};
-document.onkeydown=e=>{if(e.key==="Escape")closeModal()};
+$("backdrop").onclick=event=>{if(event.target.id==="backdrop")closeModal()};
+document.onkeydown=event=>{
+  if(event.key==="Escape"){
+    closeModal();
+    closeProfile();
+  }
+};
+
 $("directoryTab").onclick=()=>showView("directory");
 $("activityTab").onclick=()=>showView("activity");
 $("prevPage").onclick=()=>{if(state.page>1){state.page--;loadPractices()}};
@@ -427,20 +701,19 @@ for(const id of ["q","region","localAuthority","emailFilter"]){
 $("exportBtn").onclick=()=>{
   const lines=[
     ["Practice","Address","Postcode","Region","Local authority","Registration","Email","Role","Source"],
-    ...state.rows.flatMap(p=>p.contacts.length
-      ?p.contacts.map(c=>[p.name,p.address,p.postcode,p.region,p.localAuthority,p.status,c.email,c.role,c.source])
-      :[[p.name,p.address,p.postcode,p.region,p.localAuthority,p.status,"","",""]])
+    ...state.rows.flatMap(practice=>practice.contacts.length
+      ?practice.contacts.map(contact=>[practice.name,practice.address,practice.postcode,practice.region,practice.localAuthority,practice.status,contact.email,contact.role,contact.source])
+      :[[practice.name,practice.address,practice.postcode,practice.region,practice.localAuthority,practice.status,"","",""]])
   ];
-  const csv=lines.map(row=>row.map(v=>'"'+String(v??"").replaceAll('"','""')+'"').join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download="dental-practices.csv";
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const csv=lines.map(row=>row.map(value=>'"'+String(value??"").replaceAll('"','""')+'"').join(",")).join("\n");
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  link.download="dental-practices.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
 };
 
-loadUser();
-loadPractices();
+startApp();
 </script>
 </body>
 </html>
