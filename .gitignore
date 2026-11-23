@@ -5,3 +5,14 @@ Thumbs.db
 # Editor settings
 .vscode/
 .idea/
+
+# Local secrets
+.dev.vars
+.env
+.env.*
+
+# Cloudflare local files
+.wrangler/
+
+# Dependencies
+node_modules/
