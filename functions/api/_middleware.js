@@ -1,171 +1,114 @@
-let cachedKeys;
-let cachedKeysUntil = 0;
+const SESSION_COOKIE = "directory_session";
+const SESSION_TTL_SECONDS = 12 * 60 * 60;
 
-function base64UrlToBytes(value) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
-  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+function bytesToHex(bytes) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function decodePart(value) {
-  return JSON.parse(
-    new TextDecoder().decode(base64UrlToBytes(value))
+function hexToBytes(hex) {
+  return Uint8Array.from(
+    hex.match(/.{1,2}/g) || [],
+    (byte) => parseInt(byte, 16)
   );
 }
 
-async function authenticate(request, env) {
-  const team = (env.ACCESS_TEAM_DOMAIN || "")
-    .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "");
-  const audience = env.ACCESS_AUD || "";
-  const allowlist = (env.TEAM_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+export function randomHex(byteLength = 16) {
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(byteLength)));
+}
 
-  if (!team || !audience || allowlist.length !== 4) {
-    return {
-      error: "Team access is not configured. Set ACCESS_TEAM_DOMAIN, ACCESS_AUD and four TEAM_EMAILS."
-    };
-  }
+export async function hashCode(code, saltHex) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(code),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
 
-  const token = request.headers.get("Cf-Access-Jwt-Assertion");
-  if (!token) {
-    return {
-      error: "Sign in through the team access page to continue.",
-      status: 401
-    };
-  }
+  const result = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: hexToBytes(saltHex),
+      iterations: 210000,
+      hash: "SHA-256"
+    },
+    key,
+    256
+  );
 
-  const [encodedHeader, encodedPayload, encodedSignature] = token.split(".");
-  if (!encodedHeader || !encodedPayload || !encodedSignature) {
-    return { error: "Invalid sign-in token.", status: 401 };
-  }
+  return bytesToHex(new Uint8Array(result));
+}
 
-  let header;
-  let payload;
+export async function hashToken(token) {
+  const result = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(token)
+  );
 
-  try {
-    header = decodePart(encodedHeader);
-    payload = decodePart(encodedPayload);
-  } catch {
-    return { error: "Invalid sign-in token.", status: 401 };
-  }
+  return bytesToHex(new Uint8Array(result));
+}
 
-  if (header.alg !== "RS256" || !header.kid) {
-    return { error: "Unsupported sign-in token.", status: 401 };
-  }
+function getCookie(request, name) {
+  const cookies = request.headers.get("Cookie") || "";
+  const entry = cookies
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(`${name}=`));
 
-  const issuer = `https://${team}`;
-  const audienceMatches = Array.isArray(payload.aud)
-    ? payload.aud.includes(audience)
-    : payload.aud === audience;
+  return entry ? entry.slice(name.length + 1) : "";
+}
 
-  if (
-    payload.iss !== issuer ||
-    !audienceMatches ||
-    !payload.email ||
-    !Number.isFinite(payload.exp) ||
-    payload.exp < Date.now() / 1000
-  ) {
-    return {
-      error: "Sign-in token is expired or does not match this app.",
-      status: 401
-    };
-  }
+export function sessionCookie(token) {
+  return `${SESSION_COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`;
+}
 
-  const email = String(payload.email).toLowerCase();
-  if (!allowlist.includes(email)) {
-    return {
-      error: "This account is not on the team access list.",
-      status: 403
-    };
-  }
-
-  let keys = Date.now() < cachedKeysUntil ? cachedKeys : null;
-  if (!keys) {
-    keys = await env.ACCESS_KEYS?.get("jwks", "json");
-  }
-
-  if (!keys) {
-    const response = await fetch(`${issuer}/cdn-cgi/access/certs`);
-    if (!response.ok) {
-      return { error: "Could not verify team sign-in.", status: 503 };
-    }
-
-    keys = await response.json();
-    await env.ACCESS_KEYS?.put("jwks", JSON.stringify(keys), {
-      expirationTtl: 3600
-    });
-    cachedKeys = keys;
-    cachedKeysUntil = Date.now() + 3600 * 1000;
-  }
-
-  const jwk = (keys.keys || []).find((key) => key.kid === header.kid);
-  if (!jwk) {
-    return { error: "Sign-in key not recognised.", status: 401 };
-  }
-
-  try {
-    const publicKey = await crypto.subtle.importKey(
-      "jwk",
-      jwk,
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256"
-      },
-      false,
-      ["verify"]
-    );
-
-    const signedData = new TextEncoder().encode(
-      `${encodedHeader}.${encodedPayload}`
-    );
-
-    const valid = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      publicKey,
-      base64UrlToBytes(encodedSignature),
-      signedData
-    );
-
-    if (!valid) {
-      return {
-        error: "Sign-in token could not be verified.",
-        status: 401
-      };
-    }
-  } catch {
-    return {
-      error: "Sign-in token could not be verified.",
-      status: 401
-    };
-  }
-
-  return { email };
+export function clearSessionCookie() {
+  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
 }
 
 export async function onRequest(context) {
-  const identity = await authenticate(context.request, context.env);
+  const path = new URL(context.request.url).pathname;
 
-  if (identity.error) {
-    return Response.json(
-      { error: identity.error },
-      {
-        status: identity.status || 503,
-        headers: { "Cache-Control": "no-store" }
-      }
-    );
+  if (path === "/api/login" || path === "/api/setup") {
+    return context.next();
   }
 
-  context.data.user = identity.email;
+  const token = getCookie(context.request, SESSION_COOKIE);
+  if (!token) {
+    return json({ error: "Please sign in to continue." }, 401);
+  }
+
+  const tokenHash = await hashToken(token);
+  const user = await context.env.DB.prepare(
+    `SELECT users.id, users.username, users.display_name
+     FROM sessions
+     JOIN users ON users.id = sessions.user_id
+     WHERE sessions.token_hash = ?
+       AND sessions.expires_at > ?
+       AND users.active = 1`
+  )
+    .bind(tokenHash, new Date().toISOString())
+    .first();
+
+  if (!user) {
+    return json({ error: "Your session has expired. Please sign in again." }, 401);
+  }
+
+  context.data.user = user.username;
+  context.data.userId = user.id;
+  context.data.displayName = user.display_name;
+  context.data.sessionHash = tokenHash;
+
   return context.next();
 }
 
-export const json = (body, status = 200) =>
+export const json = (body, status = 200, headers = {}) =>
   Response.json(body, {
     status,
-    headers: { "Cache-Control": "no-store" }
+    headers: {
+      "Cache-Control": "no-store",
+      ...headers
+    }
   });
 
 export async function cqcFetch(path, env) {
@@ -206,11 +149,13 @@ export async function logActivity(
   await db
     .prepare(
       `INSERT INTO activity
-        (id, actor_email, action, cqc_location_id, practice_name, details, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+        (id, actor_email, actor_name, action, cqc_location_id,
+         practice_name, details, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       crypto.randomUUID(),
+      user,
       user,
       action,
       locationId,
