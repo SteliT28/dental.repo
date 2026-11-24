@@ -122,11 +122,6 @@ export async function cqcFetch(path, env) {
     env.CQC_API_BASE || "https://api.service.cqc.org.uk/public/v1/"
   );
 
-  url.searchParams.set(
-    "partnerCode",
-    env.CQC_PARTNER_CODE || "DentalPracticeDirectory"
-  );
-
   const headers = { Accept: "application/json" };
 
   if (env.CQC_API_HEADER_VALUE) {
